@@ -11,3 +11,5 @@ G
 tests/milestone.test.ts,3/b/3b241e25d1937b26b5fc6500f21839cadd73507a
 E
 contracts/backer.clar,c/7/c7ef20996cd8ce1b3bf8bce873b4f95a76ae82b0
+D
+tests/backer.test.ts,4/0/40760b7eef100e5354d880c679c0c32096551017

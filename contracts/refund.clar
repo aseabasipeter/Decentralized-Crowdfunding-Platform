@@ -6,35 +6,46 @@
 (define-constant ERR_CAMPAIGN_NOT_FOUND (err u101))
 (define-constant ERR_NO_REFUND_AVAILABLE (err u102))
 
+;; Data Maps
+(define-map campaigns
+  { id: uint }
+  { status: (string-ascii 20), deadline: uint }
+)
+
+(define-map contributions
+  { campaign-id: uint, backer: principal }
+  { amount: uint }
+)
+
 ;; Public Functions
 (define-public (request-refund (campaign-id uint))
   (let
     (
-      (campaign (unwrap! (contract-call? .campaign get-campaign campaign-id) ERR_CAMPAIGN_NOT_FOUND))
-      (contribution (unwrap! (contract-call? .backer get-contribution campaign-id tx-sender) ERR_NO_REFUND_AVAILABLE))
+      (campaign (unwrap! (map-get? campaigns { id: campaign-id }) ERR_CAMPAIGN_NOT_FOUND))
+      (contribution (unwrap! (map-get? contributions { campaign-id: campaign-id, backer: tx-sender }) ERR_NO_REFUND_AVAILABLE))
     )
     (asserts! (or (is-eq (get status campaign) "failed") (> block-height (get deadline campaign))) ERR_NOT_AUTHORIZED)
-    (asserts! (> contribution u0) ERR_NO_REFUND_AVAILABLE)
-    (try! (as-contract (stx-transfer? contribution tx-sender tx-sender)))
-    (contract-call? .backer contribute campaign-id u0)
+    (asserts! (> (get amount contribution) u0) ERR_NO_REFUND_AVAILABLE)
+    (try! (as-contract (stx-transfer? (get amount contribution) tx-sender tx-sender)))
+    (map-set contributions { campaign-id: campaign-id, backer: tx-sender } { amount: u0 })
+    (ok true)
   )
 )
 
 ;; Read-only Functions
 (define-read-only (can-refund (campaign-id uint) (backer principal))
-  (let
-    (
-      (campaign (unwrap! (contract-call? .campaign get-campaign campaign-id) false))
-      (contribution (contract-call? .backer get-contribution campaign-id backer))
-    )
-    (and
-      (is-some campaign)
-      (> contribution u0)
-      (or
-        (is-eq (get status campaign) "failed")
-        (> block-height (get deadline campaign))
+  (match (map-get? campaigns { id: campaign-id })
+    campaign-data (match (map-get? contributions { campaign-id: campaign-id, backer: backer })
+      contribution-data (and
+        (> (get amount contribution-data) u0)
+        (or
+          (is-eq (get status campaign-data) "failed")
+          (> block-height (get deadline campaign-data))
+        )
       )
+      false
     )
+    false
   )
 )
 
